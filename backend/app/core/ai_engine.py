@@ -1,5 +1,4 @@
-from google import genai
-from google.genai import types
+import os
 from app.core.config import settings
 
 # Active candidate models to try in order on unavailability, capacity spikes, or 404/503 errors
@@ -14,13 +13,14 @@ FALLBACK_MODELS = [
 ]
 
 
-def get_client() -> genai.Client:
-    """Get initialized Gemini client or raise informative error."""
-    api_key = settings.GEMINI_API_KEY
+def get_client():
+    """Lazily construct a Gemini client. Never runs at module import / OpenAPI load."""
+    api_key = os.getenv("GEMINI_API_KEY") or settings.GEMINI_API_KEY
     if not api_key or api_key == "YOUR_KEY_HERE":
         raise RuntimeError(
             "GEMINI_API_KEY is not configured. Please set your Google Gemini API key in backend/.env"
         )
+    from google import genai
     return genai.Client(api_key=api_key)
 
 
@@ -80,6 +80,8 @@ async def generate_ai_vision_response(prompt: str, image_bytes: bytes, mime_type
         if m and m not in seen:
             seen.add(m)
             models_to_try.append(m)
+
+    from google.genai import types
 
     part = types.Part.from_bytes(
         data=image_bytes,

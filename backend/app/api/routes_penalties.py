@@ -1,5 +1,6 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
+from typing import Optional
 from app.core.ai_engine import generate_ai_response
 from app.services.pdf_service import extract_text_from_all_pdfs
 

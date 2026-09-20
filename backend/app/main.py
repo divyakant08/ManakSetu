@@ -20,9 +20,12 @@ from app.api import (
 from app.core.config import settings
 
 app = FastAPI(
-    title="BIS Standard Compliance Portal",
+    title="ManakSetu API",
     description="AI-powered Bureau of Indian Standards compliance analysis platform with enterprise intelligence",
     version="2.0.0",
+    docs_url="/docs",
+    redoc_url="/redoc",
+    openapi_url="/openapi.json",
 )
 
 app.add_middleware(
@@ -59,7 +62,9 @@ app.mount(
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
-    """Global exception handler for unhandled errors."""
+    """Global exception handler for unhandled errors (does not swallow /docs schema failures)."""
+    if request.url.path in {"/openapi.json", "/docs", "/redoc", "/docs/oauth2-redirect"}:
+        raise exc
     return JSONResponse(
         status_code=500,
         content={"detail": f"Internal server error: {str(exc)}"},
