@@ -2,6 +2,7 @@ import uvicorn
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.api import (
     routes_upload,
@@ -24,14 +25,17 @@ app = FastAPI(
     version="2.0.0",
 )
 
-# CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["Content-Disposition", "Content-Type", "Content-Length"],
 )
+
+settings.STORED_DOCUMENTS_DIR.mkdir(parents=True, exist_ok=True)
+settings.TEMP_UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 
 # Mount API routers
 app.include_router(routes_upload.router, prefix="/api", tags=["Documents"])
@@ -45,6 +49,12 @@ app.include_router(routes_cml.router, prefix="/api", tags=["CM/L Verification"])
 app.include_router(routes_cml_vision.router, prefix="/api", tags=["Enhanced CM/L Vision & Registry"])
 app.include_router(routes_analytics.router, prefix="/api", tags=["Analytics"])
 app.include_router(routes_export.router, prefix="/api", tags=["Export"])
+
+app.mount(
+    "/stored_documents",
+    StaticFiles(directory=str(settings.STORED_DOCUMENTS_DIR)),
+    name="stored_documents",
+)
 
 
 @app.exception_handler(Exception)

@@ -4,10 +4,14 @@ frontend/dist/
 
 # Python / Backend
 backend/__pycache__/
+backend/**/__pycache__/
 backend/*.pyc
 backend/venv/
 backend/.env
 backend/temp_uploads/
+
+# Keep sample BIS PDFs tracked so Render can serve preloaded standards.
+# Do NOT ignore backend/stored_documents/
 
 # OS / Editor
 .DS_Store

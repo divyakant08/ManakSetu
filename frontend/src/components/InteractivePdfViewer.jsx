@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { X, ExternalLink, FileText } from 'lucide-react';
+import { getDocumentViewUrl } from '../services/api';
 
 export default function InteractivePdfViewer({ docName, initialPage = 1, onClose }) {
   const [currentPage, setCurrentPage] = useState(initialPage);
@@ -12,8 +13,7 @@ export default function InteractivePdfViewer({ docName, initialPage = 1, onClose
 
   if (!docName) return null;
 
-  const encodedDoc = encodeURIComponent(docName);
-  const pdfUrl = `http://localhost:8000/api/documents/${encodedDoc}/view#page=${currentPage}`;
+  const pdfUrl = getDocumentViewUrl(docName, currentPage);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-900/60 backdrop-blur-xs animate-fade-in">

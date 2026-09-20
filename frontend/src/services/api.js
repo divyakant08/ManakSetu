@@ -1,8 +1,18 @@
 import axios from 'axios';
 
+export const API_BASE_URL = (
+  import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api'
+).replace(/\/$/, '');
+
+export const getDocumentViewUrl = (filename, page) => {
+  const encoded = encodeURIComponent(filename);
+  const url = `${API_BASE_URL}/documents/${encoded}/view`;
+  return page ? `${url}#page=${page}` : url;
+};
+
 const api = axios.create({
-  baseURL: 'http://localhost:8000/api',
-  timeout: 120000, // 2 min timeout for AI operations
+  baseURL: API_BASE_URL,
+  timeout: 120000,
 });
 
 export const uploadFiles = async (files) => {
