@@ -10,9 +10,12 @@ export default function Sidebar({
   isOpen = true
 }) {
   const { t } = useLanguage();
-  const allSelected = documents.length > 0 && selectedDocuments.length === documents.length;
   const isAllKeyword = selectedDocuments.includes('ALL');
-  const effectiveCount = isAllKeyword ? documents.length : selectedDocuments.length;
+  const selectedSet = new Set(
+    isAllKeyword ? documents : selectedDocuments.filter((name) => name && name !== 'ALL')
+  );
+  const allSelected = documents.length > 0 && selectedSet.size === documents.length;
+  const effectiveCount = isAllKeyword ? documents.length : selectedSet.size;
 
   if (!isOpen) {
     return null;
@@ -70,7 +73,7 @@ export default function Sidebar({
         ) : (
           <ul className="space-y-1.5">
             {documents.map((doc) => {
-              const isChecked = isAllKeyword || selectedDocuments.includes(doc);
+              const isChecked = selectedSet.has(doc);
               return (
                 <li
                   key={doc}

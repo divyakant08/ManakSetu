@@ -11,26 +11,54 @@ import PenaltiesTab from './pages/PenaltiesTab';
 import CMLScannerTab from './pages/CMLScannerTab';
 import AnalyticsDashboard from './pages/AnalyticsDashboard';
 
+const AVAILABLE_DOCS_KEY = 'manaksetu_available_documents';
+const SELECTED_DOCS_KEY = 'manaksetu_selected_documents';
+
+function readStoredList(key, fallback) {
+  try {
+    const raw = localStorage.getItem(key);
+    if (raw === null) return fallback;
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function writeStoredList(key, value) {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    /* ignore quota / private-mode failures */
+  }
+}
+
+function reconcileSelection(prev, docs) {
+  if (prev.includes('ALL')) return ['ALL'];
+  const available = new Set(docs);
+  return prev.filter((name) => name && name !== 'ALL' && available.has(name));
+}
+
 function AppContent() {
   const [activeTab, setActiveTab] = useState('standards');
-  const [documents, setDocuments] = useState([]);
-  const [selectedDocuments, setSelectedDocuments] = useState(['ALL']);
+  const [documents, setDocuments] = useState(() => readStoredList(AVAILABLE_DOCS_KEY, []));
+  const [selectedDocuments, setSelectedDocuments] = useState(() =>
+    readStoredList(SELECTED_DOCS_KEY, ['ALL'])
+  );
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const { t } = useLanguage();
 
   const fetchDocuments = useCallback(async () => {
     try {
       const data = await getDocuments();
-      const docs = data.documents || [];
-      setDocuments(docs);
-      // Auto-select all by default if empty or previous selection invalid
-      setSelectedDocuments((prev) => {
-        if (prev.length === 0 || prev.includes('ALL')) return ['ALL'];
-        const valid = prev.filter((d) => docs.includes(d));
-        return valid.length > 0 ? valid : ['ALL'];
-      });
+      const remoteDocs = data.documents || [];
+      const cachedDocs = readStoredList(AVAILABLE_DOCS_KEY, []);
+      const nextDocs =
+        remoteDocs.length === 0 && cachedDocs.length > 0 ? cachedDocs : remoteDocs;
+      setDocuments(nextDocs);
+      setSelectedDocuments((selected) => reconcileSelection(selected, nextDocs));
     } catch {
-      // Backend booting
+      // Backend booting — keep cached master list visible
     }
   }, []);
 
@@ -38,18 +66,28 @@ function AppContent() {
     fetchDocuments();
   }, [fetchDocuments]);
 
+  useEffect(() => {
+    writeStoredList(AVAILABLE_DOCS_KEY, documents);
+  }, [documents]);
+
+  useEffect(() => {
+    writeStoredList(SELECTED_DOCS_KEY, selectedDocuments);
+  }, [selectedDocuments]);
+
   const handleToggleDocument = (doc) => {
     setSelectedDocuments((prev) => {
-      // If was 'ALL', switch to full list minus the toggled doc
-      const currentList = prev.includes('ALL') ? [...documents] : [...prev];
-      if (currentList.includes(doc)) {
-        const next = currentList.filter((d) => d !== doc);
-        return next;
+      const selectedSet = new Set(
+        prev.includes('ALL') ? documents : prev.filter((name) => name && name !== 'ALL')
+      );
+      if (selectedSet.has(doc)) {
+        selectedSet.delete(doc);
       } else {
-        const next = [...currentList, doc];
-        if (next.length === documents.length) return ['ALL'];
-        return next;
+        selectedSet.add(doc);
       }
+      if (documents.length > 0 && selectedSet.size === documents.length) {
+        return ['ALL'];
+      }
+      return Array.from(selectedSet);
     });
   };
 
