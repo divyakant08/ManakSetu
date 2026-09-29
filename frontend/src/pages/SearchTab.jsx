@@ -37,6 +37,7 @@ export default function SearchTab({ documents = [], selectedDocuments = [] }) {
   const [searchMode, setSearchMode] = useState('bis'); // 'bis' | 'upload'
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(false);
+  const [streaming, setStreaming] = useState(false);
   const [complete, setComplete] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
@@ -66,16 +67,34 @@ export default function SearchTab({ documents = [], selectedDocuments = [] }) {
     }
 
     setLoading(true);
+    setStreaming(false);
     setComplete(false);
     setError(null);
     setResult(null);
 
+    const handlers = {
+      onMeta: (meta) => {
+        setResult((prev) => ({
+          ...(prev || {}),
+          ...meta,
+          response: prev?.response || '',
+        }));
+      },
+      onDelta: (assembled) => {
+        setStreaming(true);
+        setResult((prev) => ({
+          ...(prev || {}),
+          response: assembled,
+        }));
+      },
+    };
+
     try {
       if (searchMode === 'bis') {
-        const data = await searchPreloadQuery(q, language, selectedDocuments);
+        const data = await searchPreloadQuery(q, language, selectedDocuments, false, handlers);
         setResult(data);
       } else {
-        const data = await searchCustomQuery(customFile, q, language);
+        const data = await searchCustomQuery(customFile, q, language, handlers);
         setResult(data);
       }
       setComplete(true);
@@ -83,6 +102,7 @@ export default function SearchTab({ documents = [], selectedDocuments = [] }) {
       setError(err.response?.data?.detail || err.message || 'Search analysis failed.');
     } finally {
       setLoading(false);
+      setStreaming(false);
     }
   };
 
@@ -322,7 +342,7 @@ export default function SearchTab({ documents = [], selectedDocuments = [] }) {
       </div>
 
       {/* Progress Bar */}
-      <ProgressBar isLoading={loading} isComplete={complete} />
+      <ProgressBar isLoading={loading} isComplete={complete} isStreaming={streaming} />
 
       {/* Error Banner */}
       {error && (

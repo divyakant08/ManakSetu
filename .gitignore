@@ -9,6 +9,7 @@ backend/*.pyc
 backend/venv/
 backend/.env
 backend/temp_uploads/
+backend/.rag_cache/
 
 # Keep sample BIS PDFs tracked so Render can serve preloaded standards.
 # Do NOT ignore backend/stored_documents/

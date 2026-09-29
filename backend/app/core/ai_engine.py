@@ -1,7 +1,10 @@
+import asyncio
+import json
 import os
+from collections.abc import AsyncIterator, Iterator
+
 from app.core.config import settings
 
-# Active candidate models to try in order on unavailability, capacity spikes, or 404/503 errors
 FALLBACK_MODELS = [
     "gemini-3.5-flash",
     "gemini-3.6-flash",
@@ -31,26 +34,44 @@ def should_try_next_model(error_str: str) -> bool:
         "503", "unavailable", "high demand", "spike", "overloaded",
         "404", "not_found", "not found",
         "429", "resource_exhausted", "quota",
-        "500", "internal", "temporary", "timeout"
+        "500", "internal", "temporary", "timeout",
     ]
     return any(trigger in err_lower for trigger in retry_triggers)
 
 
-async def generate_ai_response(prompt: str) -> str:
-    """Generate a response from Google Gemini AI with automatic resilient model fallback."""
-    client = get_client()
+def _model_list() -> list[str]:
     primary_model = settings.GEMINI_MODEL
-    
-    # Deduplicate while preserving order with primary_model first
     seen = set()
     models_to_try = []
-    for m in [primary_model] + FALLBACK_MODELS:
-        if m and m not in seen:
-            seen.add(m)
-            models_to_try.append(m)
+    for model_name in [primary_model] + FALLBACK_MODELS:
+        if model_name and model_name not in seen:
+            seen.add(model_name)
+            models_to_try.append(model_name)
+    return models_to_try
 
+
+def _chunk_text(chunk) -> str:
+    text = getattr(chunk, "text", None)
+    if text:
+        return text
+    try:
+        candidates = getattr(chunk, "candidates", None) or []
+        for candidate in candidates:
+            content = getattr(candidate, "content", None)
+            parts = getattr(content, "parts", None) or []
+            for part in parts:
+                value = getattr(part, "text", None)
+                if value:
+                    return value
+    except Exception:
+        return ""
+    return ""
+
+
+def _generate_content_sync(prompt: str) -> str:
+    client = get_client()
     last_error = None
-    for model_name in models_to_try:
+    for model_name in _model_list():
         try:
             response = client.models.generate_content(
                 model=model_name,
@@ -61,47 +82,105 @@ async def generate_ai_response(prompt: str) -> str:
         except Exception as e:
             err_str = str(e)
             last_error = e
-            # If model is unavailable (503/404/429/500), try next available model in list
             if should_try_next_model(err_str):
                 continue
             raise RuntimeError(f"Gemini API error ({model_name}): {err_str}")
-
     raise RuntimeError(f"Gemini API capacity error on all models tried: {str(last_error)}")
 
 
-async def generate_ai_vision_response(prompt: str, image_bytes: bytes, mime_type: str) -> str:
-    """Generate a response from Google Gemini AI with image input and automatic fallback."""
+async def generate_ai_response(prompt: str) -> str:
+    """Generate a response from Google Gemini AI with automatic resilient model fallback."""
+    return await asyncio.to_thread(_generate_content_sync, prompt)
+
+
+def _iter_stream(prompt: str) -> Iterator[str]:
     client = get_client()
-    primary_model = settings.GEMINI_MODEL
-
-    seen = set()
-    models_to_try = []
-    for m in [primary_model] + FALLBACK_MODELS:
-        if m and m not in seen:
-            seen.add(m)
-            models_to_try.append(m)
-
-    from google.genai import types
-
-    part = types.Part.from_bytes(
-        data=image_bytes,
-        mime_type=mime_type,
-    )
-
     last_error = None
-    for model_name in models_to_try:
+    for model_name in _model_list():
         try:
+            stream = client.models.generate_content_stream(
+                model=model_name,
+                contents=prompt,
+            )
+            yielded = False
+            for chunk in stream:
+                text = _chunk_text(chunk)
+                if text:
+                    yielded = True
+                    yield text
+            if yielded:
+                return
             response = client.models.generate_content(
                 model=model_name,
-                contents=[prompt, part],
+                contents=prompt,
             )
             if response and response.text:
-                return response.text
+                yield response.text
+                return
         except Exception as e:
             err_str = str(e)
             last_error = e
             if should_try_next_model(err_str):
                 continue
-            raise RuntimeError(f"Gemini Vision API error ({model_name}): {err_str}")
+            raise RuntimeError(f"Gemini API error ({model_name}): {err_str}")
+    raise RuntimeError(f"Gemini API capacity error on all models tried: {str(last_error)}")
 
-    raise RuntimeError(f"Gemini Vision API capacity error on all models tried: {str(last_error)}")
+
+async def generate_ai_response_stream(prompt: str) -> AsyncIterator[str]:
+    """Yield Gemini tokens as they arrive, with the same model fallback chain."""
+    loop = asyncio.get_running_loop()
+    queue: asyncio.Queue[str | None | BaseException] = asyncio.Queue()
+
+    def producer():
+        try:
+            for piece in _iter_stream(prompt):
+                loop.call_soon_threadsafe(queue.put_nowait, piece)
+            loop.call_soon_threadsafe(queue.put_nowait, None)
+        except BaseException as exc:
+            loop.call_soon_threadsafe(queue.put_nowait, exc)
+
+    worker = asyncio.create_task(asyncio.to_thread(producer))
+    try:
+        while True:
+            item = await queue.get()
+            if item is None:
+                break
+            if isinstance(item, BaseException):
+                raise item
+            yield item
+    finally:
+        await worker
+
+
+def sse_pack(payload: dict) -> str:
+    return f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
+
+
+async def generate_ai_vision_response(prompt: str, image_bytes: bytes, mime_type: str) -> str:
+    """Generate a response from Google Gemini AI with image input and automatic fallback."""
+    def _run() -> str:
+        client = get_client()
+        from google.genai import types
+
+        part = types.Part.from_bytes(
+            data=image_bytes,
+            mime_type=mime_type,
+        )
+        last_error = None
+        for model_name in _model_list():
+            try:
+                response = client.models.generate_content(
+                    model=model_name,
+                    contents=[prompt, part],
+                )
+                if response and response.text:
+                    return response.text
+            except Exception as e:
+                err_str = str(e)
+                last_error = e
+                if should_try_next_model(err_str):
+                    continue
+                raise RuntimeError(f"Gemini Vision API error ({model_name}): {err_str}")
+        raise RuntimeError(f"Gemini Vision API capacity error on all models tried: {str(last_error)}")
+
+    return await asyncio.to_thread(_run)

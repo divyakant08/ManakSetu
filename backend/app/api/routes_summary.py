@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import Optional
 from app.core.ai_engine import generate_ai_response
-from app.services.pdf_service import extract_text_from_all_pdfs
+from app.services.rag_service import BROAD_MAX_CHARS, BROAD_TOP_K, retrieve_chunks
 
 router = APIRouter()
 
@@ -25,7 +25,12 @@ LANGUAGE_INSTRUCTIONS = {
 @router.post("/summary")
 async def generate_summary(request: SummaryRequest):
     """Generate an executive compliance summary of selected official BIS documents."""
-    combined_text, doc_names = extract_text_from_all_pdfs(request.selected_documents)
+    combined_text, doc_names, _chunks = retrieve_chunks(
+        "executive summary mandatory obligations testing certification applicability key clauses",
+        request.selected_documents,
+        top_k=BROAD_TOP_K,
+        max_chars=BROAD_MAX_CHARS,
+    )
 
     if not combined_text:
         raise HTTPException(
@@ -66,9 +71,9 @@ Who this standard applies to (manufacturers, importers, sellers, etc.).
 
 Documents analyzed: {', '.join(doc_names)}
 
---- BEGIN DOCUMENT TEXT ---
+--- BEGIN RETRIEVED CLAUSES ---
 {combined_text}
---- END DOCUMENT TEXT ---
+--- END RETRIEVED CLAUSES ---
 
 Provide a detailed, well-formatted executive summary:"""
 

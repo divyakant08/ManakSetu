@@ -1,6 +1,4 @@
 import os
-import pymupdf as fitz
-from pathlib import Path
 from fastapi import UploadFile
 from app.core.config import settings
 
@@ -13,6 +11,9 @@ async def save_uploaded_file(file: UploadFile) -> str:
     contents = await file.read()
     with open(file_path, "wb") as f:
         f.write(contents)
+    from app.services.rag_service import invalidate_document, index_document
+    invalidate_document(file.filename)
+    index_document(file.filename)
     return file.filename
 
 
@@ -32,6 +33,8 @@ def delete_document(filename: str) -> bool:
     file_path = settings.STORED_DOCUMENTS_DIR / filename
     if file_path.exists() and file_path.is_file():
         os.remove(file_path)
+        from app.services.rag_service import invalidate_document
+        invalidate_document(filename)
         return True
     return False
 
@@ -58,29 +61,5 @@ def extract_text_from_all_pdfs(selected_documents: list[str] | None = None) -> t
     if not documents:
         return "", []
 
-    combined_parts: list[str] = []
-    total_length = 0
-
-    for doc_name in documents:
-        doc_path = settings.STORED_DOCUMENTS_DIR / doc_name
-        try:
-            pdf = fitz.open(str(doc_path))
-            for page_num in range(len(pdf)):
-                page = pdf[page_num]
-                text = page.get_text("text")
-                if text.strip():
-                    marker = f"\n--- Doc: {doc_name} | Page {page_num + 1} ---\n"
-                    segment = marker + text
-                    if total_length + len(segment) > MAX_COMBINED_TEXT_LENGTH:
-                        combined_parts.append(
-                            f"\n--- [TEXT TRUNCATED: Reached {MAX_COMBINED_TEXT_LENGTH} char limit] ---"
-                        )
-                        pdf.close()
-                        return "".join(combined_parts), documents
-                    combined_parts.append(segment)
-                    total_length += len(segment)
-            pdf.close()
-        except Exception as e:
-            combined_parts.append(f"\n--- Error reading {doc_name}: {str(e)} ---\n")
-
-    return "".join(combined_parts), documents
+    from app.services.rag_service import get_corpus_text
+    return get_corpus_text(documents, max_chars=MAX_COMBINED_TEXT_LENGTH)

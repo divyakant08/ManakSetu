@@ -4,7 +4,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import Optional
 from app.core.ai_engine import generate_ai_response
-from app.services.pdf_service import extract_text_from_all_pdfs
+from app.services.rag_service import BROAD_MAX_CHARS, BROAD_TOP_K, retrieve_chunks
 
 router = APIRouter()
 
@@ -34,7 +34,14 @@ async def run_predictive_gap_analysis(request: GapAnalysisRequest):
     if not request.specs or not request.specs.strip():
         raise HTTPException(status_code=400, detail="Technical specifications input cannot be empty.")
 
-    combined_text, doc_names = extract_text_from_all_pdfs()
+    retrieval_query = " ".join(
+        part for part in [request.specs, request.standard_hint or ""] if part
+    )
+    combined_text, doc_names, _chunks = retrieve_chunks(
+        retrieval_query,
+        top_k=BROAD_TOP_K,
+        max_chars=BROAD_MAX_CHARS,
+    )
 
     if not combined_text or not doc_names:
         raise HTTPException(
@@ -50,9 +57,9 @@ async def run_predictive_gap_analysis(request: GapAnalysisRequest):
 
 TASK: Perform a rigorous, predictive Compliance Gap Analysis by evaluating the user's Technical Specifications against the official BIS Standards loaded below.
 
---- BEGIN REPOSITORY STANDARDS ---
+--- BEGIN RETRIEVED CLAUSES ---
 {combined_text}
---- END REPOSITORY STANDARDS ---
+--- END RETRIEVED CLAUSES ---
 
 USER PRODUCT TECHNICAL SPECIFICATIONS:
 \"\"\"
