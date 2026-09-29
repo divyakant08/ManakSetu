@@ -10,7 +10,7 @@ const DICTIONARY = {
   English: {
     // Brand & Header
     portalTitle: 'BIS Standard Compliance & Analytics Portal',
-    portalShortTitle: 'BIS Compliance Portal',
+    portalShortTitle: 'ManakSetu',
     motto: 'मानक: पथप्रदर्शक: • Bureau of Indian Standards',
     enterpriseBadge: 'Enterprise Portal',
     activeStandards: 'Standards',
@@ -176,7 +176,7 @@ const DICTIONARY = {
   Hindi: {
     // Brand & Header
     portalTitle: 'बीआईएस मानक अनुपालन एवं एनालिटिक्स पोर्टल',
-    portalShortTitle: 'बीआईएस अनुपालन पोर्टल',
+    portalShortTitle: 'ManakSetu',
     motto: 'मानक: पथप्रदर्शक: • भारतीय मानक ब्यूरो',
     enterpriseBadge: 'एंटरप्राइज पोर्टल',
     activeStandards: 'मानक',
@@ -342,7 +342,7 @@ const DICTIONARY = {
   Marathi: {
     // Brand & Header
     portalTitle: 'बीआयएस मानक अनुपालन आणि ॲनालिटिक्स पोर्टल',
-    portalShortTitle: 'बीआयएस अनुपालन पोर्टल',
+    portalShortTitle: 'ManakSetu',
     motto: 'मानक: पथप्रदर्शक: • भारतीय मानक ब्युरो',
     enterpriseBadge: 'एंटरप्राइज पोर्टल',
     activeStandards: 'मानके',

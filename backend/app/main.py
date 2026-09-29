@@ -72,7 +72,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 @app.get("/")
 async def root():
     return {
-        "message": "BIS Standard Compliance Portal Enterprise API",
+        "message": "ManakSetu Enterprise API",
         "version": "2.0.0",
         "docs": "/docs",
     }

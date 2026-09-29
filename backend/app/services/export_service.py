@@ -30,7 +30,7 @@ class NumberedCanvas(canvas.Canvas):
         self.setFillColor(colors.HexColor("#64748b"))
         
         # Footer
-        footer_text = f"BIS Standard Compliance Portal — Page {self._pageNumber} of {page_count}"
+        footer_text = f"ManakSetu — Page {self._pageNumber} of {page_count}"
         self.drawCentredString(letter[0] / 2.0, 30, footer_text)
         
         # Bottom rule

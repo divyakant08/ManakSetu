@@ -43,7 +43,7 @@ export default function Navbar({ isSidebarOpen, setIsSidebarOpen, documentCount 
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-sm sm:text-base font-extrabold text-white tracking-tight flex items-center gap-1.5">
-                  <span className="text-gold-400">BIS</span> Compliance Portal
+                  <span className="text-gold-400">{t.portalShortTitle}</span>
                 </h1>
                 <span className="hidden md:inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-gold-500/10 border border-gold-500/30 text-gold-300 uppercase tracking-wider">
                   {t.enterpriseBadge}
